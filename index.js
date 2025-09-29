@@ -76,8 +76,8 @@ app.post('/search-medicine', async (req, res) => {
 
     const message = `طلب دواء جديد:\n\n*اسم الدواء:* ${medicineName}\n*المنطقة:* ${area}\n\nهل الدواء متوفر لديكم؟`;
     
-    // إرسال الرسالة إلى كل صيدلية مع معرف الطلب
-    for (const p tharmacy of pharmacies) {
+    // **التصحيح هنا:** تم تغيير (p tharmacy) إلى (pharmacy)
+    for (const pharmacy of pharmacies) {
         bot.sendMessage(pharmacy.chatId, message);
     }
     
