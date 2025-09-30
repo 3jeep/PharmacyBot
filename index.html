@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>خدمة البحث عن الأدوية</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+.loader {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4f46e5;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }}
+</style>
 </head>
 <body class="bg-gray-50 flex items-center justify-center min-h-screen">
 
@@ -14,22 +25,26 @@
   <form id="searchForm" class="space-y-4">
     <input type="text" id="medicineName" placeholder="اسم الدواء" class="w-full p-2 border rounded" required>
     <input type="text" id="area" placeholder="المنطقة" class="w-full p-2 border rounded" required>
-    <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">إرسال</button>
+    <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">
+      <span id="btnText">إرسال</span>
+    </button>
   </form>
   
   <div id="statusMessage" class="mt-4 text-center hidden"></div>
 </div>
 
 <script>
-const RENDER_API_URL = '/search-medicine'; // نفس السيرفر والـ localhost
+const RENDER_API_URL = '/search-medicine'; // نسبي → يشتغل على localhost أو أي سيرفر
 
 const form = document.getElementById('searchForm');
 const statusMessage = document.getElementById('statusMessage');
+const btnText = document.getElementById('btnText');
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   statusMessage.classList.remove('hidden');
   statusMessage.textContent = 'جارٍ إرسال الطلب...';
+  btnText.innerHTML = '<div class="loader"></div>';
 
   const medicineName = document.getElementById('medicineName').value.trim();
   const area = document.getElementById('area').value.trim();
@@ -52,6 +67,8 @@ form.addEventListener('submit', async (e) => {
 
   } catch(err){
     statusMessage.textContent = '❌ خطأ في الاتصال بالخادم.';
+  } finally {
+    btnText.textContent = 'إرسال';
   }
 });
 </script>
