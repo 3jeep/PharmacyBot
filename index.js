@@ -2,6 +2,7 @@
 const admin = require('firebase-admin');
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
+const bodyParser = require('body-parser'); // تم إضافة مكتبة body-parser
 
 // ====== 2. إعداد Firebase ======
 // سيقوم الخادم بقراءة متغيرات البيئة تلقائياً
@@ -30,7 +31,11 @@ console.log("Firebase connected ✅");
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(express.json()); // مهم لاستقبال بيانات JSON
+// استخدم bodyParser لمعالجة طلبات البحث العادية
+app.use('/search-medicine', bodyParser.json()); 
+
+// استخدم مسار افتراضي (General JSON for non-Telegram routes)
+app.use(express.json()); 
 
 app.get('/', (req, res) => {
   res.send("PharmacyBot Server Running 🚀");
@@ -42,13 +47,17 @@ app.listen(PORT, () => {
 
 // ====== 4. إعداد Telegram Bot ======
 const token = process.env.TELEGRAM_BOT_TOKEN;
+const url = "https://pharmacybotservice.onrender.com"; 
 
-// يجب تعطيل الـ polling عند استخدام Webhook
-const bot = new TelegramBot(token, { polling: false }); 
+// تهيئة البوت ليعمل كـ Webhook (Polling: False)
+const bot = new TelegramBot(token, { 
+    polling: false
+}); 
 
 
-// إعداد Webhook لاستقبال الرسائل من تلغرام (مسار ثابت الآن)
-app.post(`/webhook`, (req, res) => {
+// إعداد Webhook لاستقبال الرسائل من تلغرام
+// يتم استخدام body-parser.json لتجنب خطأ "headers already sent"
+app.post(`/webhook`, bodyParser.json(), (req, res) => {
     // هذا السطر للتأكد من استقبال الطلب
     console.log("استلمت طلباً جديداً من تلغرام على المسار /webhook!"); 
 
