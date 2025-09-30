@@ -4,20 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>قائمة الصيدليات</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h1 { text-align: center; }
-    .pharmacy { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    body { font-family: Arial, sans-serif; background: #f7f7f7; padding: 20px; }
+    h1 { text-align: center; color: #333; }
+    .pharmacy { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+    .pharmacy p { margin: 5px 0; }
   </style>
 </head>
 <body>
   <h1>قائمة الصيدليات</h1>
   <div id="pharmacies"></div>
 
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
-    // ===== Firebase Configuration =====
     const firebaseConfig = {
       apiKey: "AIzaSyDlEBzVFhJzFkDI4mWnTSEQbUGOYBoVvbI",
       authDomain: "group-2f790.firebaseapp.com",
@@ -27,28 +27,27 @@
       appId: "1:532610990999:web:1ad2bf5149c68774e57ad2"
     };
 
-    // ===== Initialize Firebase =====
+    // Initialize Firebase
     const app = firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const container = document.getElementById("pharmacies");
+    const pharmaciesDiv = document.getElementById("pharmacies");
 
-    // ===== Fetch Pharmacies =====
-    db.collection("pharmacies").get().then(snapshot => {
+    db.collection("pharmacies").orderBy("timestamp", "desc").get().then(snapshot => {
       snapshot.forEach(doc => {
         const data = doc.data();
         const div = document.createElement("div");
         div.className = "pharmacy";
         div.innerHTML = `
-          <strong>اسم الصيدلية:</strong> ${data.name || 'غير محدد'} <br>
-          <strong>رقم الواتساب:</strong> ${data.whatsapp || 'غير محدد'} <br>
-          <strong>الموقع:</strong> ${data.location || 'غير محدد'}
+          <p><strong>الاسم:</strong> ${data.name}</p>
+          <p><strong>واتساب:</strong> ${data.whatsapp}</p>
+          <p><strong>الموقع:</strong> ${data.location}</p>
         `;
-        container.appendChild(div);
+        pharmaciesDiv.appendChild(div);
       });
-    }).catch(error => {
-      container.innerHTML = `<p>حدث خطأ في جلب البيانات: ${error.message}</p>`;
-      console.error(error);
+    }).catch(err => {
+      pharmaciesDiv.innerHTML = "<p>حدث خطأ أثناء جلب البيانات</p>";
+      console.error(err);
     });
   </script>
 </body>
