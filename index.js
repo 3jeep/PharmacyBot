@@ -42,7 +42,7 @@ const webhookUrl = `https://pharmacybotservice.onrender.com/webhook`;
 app.use(express.json());
 
 // ************ FIX: حل مشكلة Cannot GET /index.html ************
-// هذا السطر يسمح لـ Express بتقديم الملفات الثابتة مثل index.html
+// هذا السطر يسمح لـ Express بتقديم الملفات الثابتة مثل index.html من نفس المجلد
 app.use(express.static(__dirname)); 
 
 // ************ حل مشكلة CORS ************
@@ -55,7 +55,7 @@ app.use((req, res, next) => {
 
 // رسالة ترحيب بسيطة (المسار الأساسي)
 app.get('/', (req, res) => {
-    // بدلاً من إرسال رسالة، قم بتحويل المستخدم إلى ملف index.html
+    // توجيه المستخدم إلى ملف index.html
     res.redirect('/index.html');
 });
 
