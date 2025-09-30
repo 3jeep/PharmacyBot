@@ -3,30 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الصيدليات المحفوظة</title>
+  <title>قائمة الصيدليات</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { text-align: center; }
+    .pharmacy { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
+  </style>
 </head>
 <body>
-  <h1>الصيدليات المحفوظة</h1>
-  <ul id="pharmacyList"></ul>
+  <h1>قائمة الصيدليات</h1>
+  <div id="pharmacies"></div>
 
   <script>
-    async function fetchPharmacies() {
-      try {
-        const res = await fetch('/pharmacies');
-        const data = await res.json();
-        const list = document.getElementById('pharmacyList');
-        list.innerHTML = '';
-        data.forEach(p => {
-          const li = document.createElement('li');
-          li.textContent = `${p.name} - ChatID: ${p.chatId}`;
-          list.appendChild(li);
-        });
-      } catch (err) {
-        console.error('Error fetching pharmacies:', err);
-      }
-    }
+    // ===== Firebase Configuration =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyDlEBzVFhJzFkDI4mWnTSEQbUGOYBoVvbI",
+      authDomain: "group-2f790.firebaseapp.com",
+      projectId: "group-2f790",
+      storageBucket: "group-2f790.appspot.com",
+      messagingSenderId: "532610990999",
+      appId: "1:532610990999:web:1ad2bf5149c68774e57ad2"
+    };
 
-    fetchPharmacies();
+    // ===== Initialize Firebase =====
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const container = document.getElementById("pharmacies");
+
+    // ===== Fetch Pharmacies =====
+    db.collection("pharmacies").get().then(snapshot => {
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const div = document.createElement("div");
+        div.className = "pharmacy";
+        div.innerHTML = `
+          <strong>اسم الصيدلية:</strong> ${data.name || 'غير محدد'} <br>
+          <strong>رقم الواتساب:</strong> ${data.whatsapp || 'غير محدد'} <br>
+          <strong>الموقع:</strong> ${data.location || 'غير محدد'}
+        `;
+        container.appendChild(div);
+      });
+    }).catch(error => {
+      container.innerHTML = `<p>حدث خطأ في جلب البيانات: ${error.message}</p>`;
+      console.error(error);
+    });
   </script>
 </body>
 </html>
