@@ -1,90 +1,59 @@
-// ====== استدعاء المكتبات ======
+const TelegramBot = require('node-telegram-bot-api');
+require('dotenv').config();
 const admin = require('firebase-admin');
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config(); // مهم جداً
 
-// ====== إعداد Firebase ======
-const serviceAccount = {
-  type: "service_account",
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
-  universe_domain: "googleapis.com"
-};
+// ====== إعداد Firebase (نفترض انك ضبطته) ======
+admin.initializeApp({
+  credential: admin.credential.cert({
+    type: "service_account",
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    client_id: process.env.FIREBASE_CLIENT_ID,
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
+  })
+});
+const db = admin.firestore();
 
-let db;
-try {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-  db = admin.firestore();
-  console.log("Firebase connected ✅");
-} catch (err) {
-  console.error("FIREBASE INIT ERROR:", err.message);
-  process.exit(1);
-}
+// ====== إعداد البوت ======
+const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
 
-// ====== إعداد Express ======
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-// ====== صفحة العرض ======
-app.get('/', (req, res) => {
-  res.sendFile('index.html', { root: 'public' });
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, `مرحباً! 👋\nادخل بياناتك بهذا الشكل:\nالاسم، رقم الواتساب، الموقع`);
 });
 
-// ====== حفظ بيانات الصيدليات ======
-app.post('/save-pharmacy', async (req, res) => {
+// ====== استقبال البيانات ======
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  // نتجاهل أوامر البوت مثل /start
+  if (text.startsWith('/')) return;
+
+  // نتوقع صيغة: الاسم، رقم الواتساب، الموقع
+  const parts = text.split(',');
+  if (parts.length !== 3) {
+    return bot.sendMessage(chatId, `❌ الصيغة غير صحيحة. الرجاء: الاسم، رقم الواتساب، الموقع`);
+  }
+
+  const [name, whatsapp, location] = parts.map(p => p.trim());
+
   try {
-    const { name, whatsapp, location } = req.body;
-
-    console.log("بيانات الصيدلي القادمة:", { name, whatsapp, location });
-
-    if (!name || !whatsapp || !location) {
-      return res.status(400).json({ success: false, message: "البيانات ناقصة!" });
-    }
-
-    const docRef = db.collection('pharmacies').doc(whatsapp);
-    await docRef.set({
+    await db.collection('pharmacies').doc(chatId.toString()).set({
       name,
       whatsapp,
       location,
+      chatId,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
-
-    console.log("✅ تم حفظ بيانات الصيدلي بنجاح:", whatsapp);
-    res.json({ success: true, message: "تم حفظ البيانات بنجاح." });
-
-  } catch (error) {
-    console.error("❌ خطأ أثناء حفظ البيانات:", error.message);
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء حفظ البيانات" });
+    bot.sendMessage(chatId, `✅ تم حفظ بياناتك بنجاح!`);
+  } catch (err) {
+    console.error(err);
+    bot.sendMessage(chatId, `❌ حدث خطأ أثناء حفظ البيانات`);
   }
-});
-
-// ====== عرض بيانات الصيدليات ======
-app.get('/pharmacies', async (req, res) => {
-  try {
-    const snapshot = await db.collection('pharmacies').orderBy('timestamp', 'desc').get();
-    const pharmacies = snapshot.docs.map(doc => doc.data());
-    res.json(pharmacies);
-  } catch (error) {
-    console.error("❌ خطأ أثناء جلب البيانات:", error.message);
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب البيانات" });
-  }
-});
-
-// ====== تشغيل السيرفر ======
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
