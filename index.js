@@ -1,4 +1,4 @@
-// ====== 1. استدعاء المكتبات المطلوبة ======const admin = require('firebase-admin');const express = require('express');const TelegramBot = require('node-telegram-bot-api');const cors = require('cors'); // مكتبة CORS المضافة// ====== 2. إعداد Firebase ======// سيقوم الخادم بقراءة متغيرات البيئة تلقائياًconst serviceAccount = {type: "service_account",project_id: process.env.FIREBASE_PROJECT_ID,private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,// يجب معالجة مفتاح Private Key لضمان قراءته بشكل صحيحprivate_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\n/g, '\n') : undefined,client_email: process.env.FIREBASE_CLIENT_EMAIL,client_id: process.env.FIREBASE_CLIENT_ID,auth_uri: "https://accounts.google.com/o/oauth2/auth",token_uri: "https://oauth2.googleapis.com/token",auth_provider_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,universe_domain: "googleapis.com"};// تم لف تهيئة Firebase في دالة تشغيل الخادم لمنع استخدام await خارج async.async function initializeAndStartServer() {try {admin.initializeApp({credential: admin.credential.cert(serviceAccount)});console.log("Firebase connected ✅");} catch (error) {console.error("FIREBASE ERROR:", error.message);process.exit(1);}const db = admin.firestore();
+// ====== 1. استدعاء المكتبات المطلوبة ======const admin = require('firebase-admin');const express = require('express');const TelegramBot = require('node-telegram-bot-api');const cors = require('cors');// ====== 2. إعداد Firebase ======const serviceAccount = {type: "service_account",project_id: process.env.FIREBASE_PROJECT_ID,private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\n/g, '\n') : undefined,client_email: process.env.FIREBASE_CLIENT_EMAIL,client_id: process.env.FIREBASE_CLIENT_ID,auth_uri: "https://accounts.google.com/o/oauth2/auth",token_uri: "https://oauth2.googleapis.com/token",auth_provider_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,universe_domain: "googleapis.com"};async function initializeAndStartServer() {try {admin.initializeApp({credential: admin.credential.cert(serviceAccount)});console.log("Firebase connected ✅");} catch (error) {console.error("FIREBASE ERROR:", error.message);process.exit(1);}const db = admin.firestore();
 
 // ====== 3. إعداد Express و تشغيل الخادم ======
 const app = express();
@@ -6,18 +6,11 @@ const PORT = process.env.PORT || 10000;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const webhookUrl = `https://pharmacybotservice.onrender.com/webhook`;
 
-// تفعيل مكتبة CORS لحل مشكلة الاتصال
 app.use(cors());
-
-// Middleware لمعالجة JSON
 app.use(express.json());
-
-// هذا يسمح لـ Express بتقديم الملفات الثابتة من مجلد public
 app.use(express.static('public')); 
 
-// رسالة ترحيب بسيطة (المسار الأساسي)
 app.get('/', (req, res) => {
-    // توجيه المستخدم إلى ملف index.html في مجلد public
     res.sendFile('index.html', { root: 'public' });
 });
 
@@ -32,14 +25,12 @@ if (!token) {
     console.log("Telegram Token found.");
 }
 
-// إعداد Webhook عند بدء تشغيل الخادم
 bot.setWebHook(webhookUrl).then(() => {
     console.log(`Webhook set to ${webhookUrl}`);
 }).catch(e => {
     console.error("Error setting webhook:", e.message);
 });
 
-// استقبال الرسائل من تلغرام
 app.post(`/webhook`, (req, res) => {
     console.log("استلمت طلباً جديداً من تلغرام على المسار /webhook!");
     bot.processUpdate(req.body);
@@ -51,7 +42,6 @@ app.post(`/webhook`, (req, res) => {
 app.post('/search-medicine', async (req, res) => {
     const { medicineName, area } = req.body;
     
-    // إنشاء معرف فريد للبحث وتخزين الطلب في Firebase
     const searchRef = db.collection('searches').doc();
     const searchId = searchRef.id;
 
@@ -62,7 +52,6 @@ app.post('/search-medicine', async (req, res) => {
         status: 'pending'
     });
 
-    // ************ إرسال تنبيه عبر تلغرام ************
     const pharmacies = [
         { name: "صيدلية التوفيق", chatId: "YOUR_PHARMACY_CHAT_ID_1" },
         { name: "صيدلية النور", chatId: "YOUR_PHARMACY_CHAT_ID_2" }
@@ -70,7 +59,6 @@ app.post('/search-medicine', async (req, res) => {
 
     const message = `طلب دواء جديد:\n\n*اسم الدواء:* ${medicineName}\n*المنطقة:* ${area}\n\nيرجى الرد بـ "متوفر ${searchId}" إذا كان الدواء متوفراً لديكم.`;
     
-    // إرسال الرسالة إلى كل صيدلية
     for (const pharmacy of pharmacies) {
         try {
             await bot.sendMessage(pharmacy.chatId, message, { parse_mode: 'Markdown' });
@@ -80,7 +68,6 @@ app.post('/search-medicine', async (req, res) => {
         }
     }
     
-    // إرسال رد النجاح إلى الواجهة الأمامية (Frontend)
     res.json({ 
         success: true, 
         message: 'تم إرسال طلب البحث إلى الصيدليات بنجاح.', 
@@ -94,13 +81,11 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // معالجة الأمر /test للتأكد من أن البوت يعمل
     if (text === '/test' || text === '/start') {
         bot.sendMessage(chatId, 'نعم! البوت يعمل ويرد الآن بشكل مباشر.');
         return;
     }
 
-    // منطق الرد: نبحث عن كلمة "متوفر" متبوعة بالـ SearchId
     const match = text.match(/متوفر\s+([a-zA-Z0-9]+)/i);
 
     if (match) {
@@ -109,7 +94,6 @@ bot.on('message', async (msg) => {
 
         console.log(`Received AVAILABILITY confirmation for Search ID: ${searchId} from Chat ID: ${pharmacyId}`);
 
-        // تحديث Firebase بأن الدواء متوفر
         const responseRef = db.doc(`searches/${searchId}`);
         await responseRef.update({
             status: 'available',
@@ -120,7 +104,6 @@ bot.on('message', async (msg) => {
         }).then(() => {
             bot.sendMessage(chatId, 'شكراً لك على تأكيد توفر الدواء!');
         }).catch(e => {
-             // إرسال خطأ إذا لم يتم العثور على SearchId أو فشل التحديث
             bot.sendMessage(chatId, 'عفواً، فشل تحديث حالة الطلب. قد يكون معرف الطلب غير صحيح.');
             console.error('Firebase update failed:', e.message);
         });
@@ -135,4 +118,4 @@ bot.on('message', async (msg) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
-}// تشغيل وظيفة الإعداد والبدءinitializeAndStartServer();
+}initializeAndStartServer();
