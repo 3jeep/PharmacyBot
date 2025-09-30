@@ -1,10 +1,10 @@
-require('dotenv').config(); // عشان ياخد المتغيرات من Render أو .env
+require('dotenv').config();
 const admin = require('firebase-admin');
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const cors = require('cors');
 
-// ====== Firebase setup ======
+// Firebase setup
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID,
@@ -24,59 +24,43 @@ admin.initializeApp({
 const db = admin.firestore();
 console.log("Firebase connected ✅");
 
-// ====== Telegram Bot setup ======
+// Telegram Bot setup
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: false }); // نستخدم webhook
-const app = express();
-const PORT = process.env.PORT || 10000;
+const bot = new TelegramBot(token, { polling: true }); // بوت تلجرام فقط للحفظ
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public')); // محتوى HTML
-
-const webhookUrl = `https://YOUR_RENDER_URL/webhook`; // غيّرها لرابطك على Render
-
-bot.setWebHook(webhookUrl)
-  .then(() => console.log(`Webhook set to ${webhookUrl}`))
-  .catch(e => console.error("Error setting webhook:", e.message));
-
-// ====== Webhook endpoint ======
-app.post('/webhook', (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-// ====== حفظ صيدلية عند الضغط على ستار ======
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text;
+  const name = msg.from.first_name || 'صيدلية مجهولة';
 
-  if (text === '/start') {
-    bot.sendMessage(chatId, 'مرحباً! سيتم حفظ بياناتك عند الضغط على "ستار" في الصفحة.');
-    return;
-  }
-
-  if (text.toLowerCase() === 'register') { // أي كلمة تريّحك للحفظ
+  if (msg.text && msg.text.toLowerCase() === 'register') {
+    // حفظ بيانات الصيدلية
     await db.collection('pharmacies').doc(String(chatId)).set({
       chatId,
-      name: msg.from.first_name || 'صيدلية مجهولة',
+      name,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     });
     bot.sendMessage(chatId, 'تم حفظ بياناتك في قاعدة البيانات ✅');
   }
 });
 
-// ====== عرض الصيدليات ======
+// Express server
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// endpoint لصفحة الصيدليات
 app.get('/pharmacies', async (req, res) => {
   const snapshot = await db.collection('pharmacies').get();
   const pharmacies = snapshot.docs.map(doc => doc.data());
   res.json(pharmacies);
 });
 
-// ====== الصفحة الرئيسية ======
+// الصفحة الرئيسية
 app.get('/', (req, res) => {
   res.sendFile('index.html', { root: 'public' });
 });
 
-// ====== Start server ======
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
