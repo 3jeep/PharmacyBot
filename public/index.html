@@ -3,45 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>عرض الصيدليات</title>
+  <title>الصيدليات المحفوظة</title>
 </head>
 <body>
-  <h1>الصيدليات المسجلة</h1>
-  <ul id="pharmacy-list">
-    <li>جاري التحميل...</li>
-  </ul>
+  <h1>الصيدليات المحفوظة</h1>
+  <ul id="pharmacyList"></ul>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-
-    // إعدادات Firebase الحقيقية
-    const firebaseConfig = {
-      apiKey: "AIzaSyDlEBzVFhJzFkDI4mWnTSEQbUGOYBoVvbI",
-      authDomain: "group-2f790.firebaseapp.com",
-      projectId: "group-2f790",
-      storageBucket: "group-2f790.appspot.com",
-      messagingSenderId: "532610990999",
-      appId: "1:532610990999:web:1ad2bf5149c68774e57ad2"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    async function loadPharmacies() {
-      const pharmaciesCol = collection(db, 'pharmacies');
-      const snapshot = await getDocs(pharmaciesCol);
-      const list = document.getElementById('pharmacy-list');
-      list.innerHTML = ''; // تفريغ القائمة قبل العرض
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const li = document.createElement('li');
-        li.textContent = `${data.name} - واتس: ${data.whatsapp} - تفاصيل: ${data.details}`;
-        list.appendChild(li);
-      });
+  <script>
+    async function fetchPharmacies() {
+      try {
+        const res = await fetch('/pharmacies');
+        const data = await res.json();
+        const list = document.getElementById('pharmacyList');
+        list.innerHTML = '';
+        data.forEach(p => {
+          const li = document.createElement('li');
+          li.textContent = `${p.name} - ChatID: ${p.chatId}`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error('Error fetching pharmacies:', err);
+      }
     }
 
-    window.onload = loadPharmacies;
+    fetchPharmacies();
   </script>
 </body>
 </html>
