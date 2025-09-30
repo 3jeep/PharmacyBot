@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 require('dotenv').config();
 const admin = require('firebase-admin');
 
-// ====== إعداد Firebase (نفترض انك ضبطته) ======
+// ====== إعداد Firebase ======
 admin.initializeApp({
   credential: admin.credential.cert({
     type: "service_account",
@@ -20,8 +20,9 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // ====== إعداد البوت ======
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
+// ====== رسالة الترحيب ======
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, `مرحباً! 👋\nادخل بياناتك بهذا الشكل:\nالاسم، رقم الواتساب، الموقع`);
@@ -43,6 +44,11 @@ bot.on('message', async (msg) => {
 
   const [name, whatsapp, location] = parts.map(p => p.trim());
 
+  // تحقق بسيط من البيانات
+  if (!name || !whatsapp || !location) {
+    return bot.sendMessage(chatId, `❌ لا يمكن ترك أي حقل فارغ. الرجاء إدخال: الاسم، رقم الواتساب، الموقع`);
+  }
+
   try {
     await db.collection('pharmacies').doc(chatId.toString()).set({
       name,
@@ -57,3 +63,6 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ حدث خطأ أثناء حفظ البيانات`);
   }
 });
+
+console.log("Firebase connected ✅");
+console.log("Telegram Bot running ✅");
