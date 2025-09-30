@@ -41,6 +41,10 @@ const webhookUrl = `https://pharmacybotservice.onrender.com/webhook`;
 // Middleware لمعالجة JSON
 app.use(express.json());
 
+// ************ FIX: حل مشكلة Cannot GET /index.html ************
+// هذا السطر يسمح لـ Express بتقديم الملفات الثابتة مثل index.html
+app.use(express.static(__dirname)); 
+
 // ************ حل مشكلة CORS ************
 // Middleware للسماح بطلبات من أي نطاق (ضروري لعمل الواجهة الأمامية)
 app.use((req, res, next) => {
@@ -49,13 +53,14 @@ app.use((req, res, next) => {
     next();
 });
 
-// رسالة ترحيب بسيطة
+// رسالة ترحيب بسيطة (المسار الأساسي)
 app.get('/', (req, res) => {
-    res.send("PharmacyBot Server Running 🚀 and ready for Webhooks.");
+    // بدلاً من إرسال رسالة، قم بتحويل المستخدم إلى ملف index.html
+    res.redirect('/index.html');
 });
-// ====== 4. إعداد Telegram Bot ======
 
-// يجب تعطيل الـ polling عند استخدام Webhook
+
+// ====== 4. إعداد Telegram Bot و Webhook ======
 const bot = new TelegramBot(token, { polling: false });
 
 if (!token) {
@@ -72,18 +77,16 @@ bot.setWebHook(webhookUrl).then(() => {
     console.error("Error setting webhook:", e.message);
 });
 
-// إعداد Webhook لاستقبال الرسائل من تلغرام على المسار الثابت
+// استقبال الرسائل من تلغرام
 app.post(`/webhook`, (req, res) => {
     console.log("استلمت طلباً جديداً من تلغرام على المسار /webhook!");
     bot.processUpdate(req.body);
-    // يجب إرسال 200 فوراً حتى لو لم يكن هناك رد مباشر
     res.sendStatus(200); 
 });
+
+
 // ====== 5. وظيفة البحث في الصيدليات وإرسال الرسائل ======
 app.post('/search-medicine', async (req, res) => {
-    // يجب أن تكون هذه الدالة أول شيء يتم معالجته
-    // بعد إرسال res.sendStatus(200)، لا يمكن إرسال أي رد آخر.
-
     const { medicineName, area } = req.body;
     
     // إنشاء معرف فريد للبحث وتخزين الطلب في Firebase
@@ -108,8 +111,8 @@ app.post('/search-medicine', async (req, res) => {
     
     // إرسال الرسالة إلى كل صيدلية
     for (const pharmacy of pharmacies) {
-        // نستخدم try-catch لأن بعض الـ Chat IDs قد تكون غير صالحة
         try {
+            // نستخدم parse_mode: 'Markdown' لتنسيق الرسالة
             await bot.sendMessage(pharmacy.chatId, message, { parse_mode: 'Markdown' });
             console.log(`Sent request to ${pharmacy.name}`);
         } catch (error) {
@@ -124,6 +127,8 @@ app.post('/search-medicine', async (req, res) => {
         searchId: searchId 
     });
 });
+
+
 // ====== 6. الاستماع لردود الصيدليات وتحديث Firebase ======
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -164,6 +169,8 @@ bot.on('message', async (msg) => {
         console.log(`تم استلام رسالة عادية من: ${chatId}. النص: ${text}`);
     }
 });
+
+
 // ====== 7. بدء تشغيل الخادم ======
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
