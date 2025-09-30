@@ -1,60 +1,47 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>قائمة الصيدليات</title>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<style>
-body { font-family: Arial, sans-serif; padding: 20px; }
-h1 { color: #4f46e5; }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
-th { background-color: #f0f0f0; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عرض الصيدليات</title>
 </head>
 <body>
+  <h1>الصيدليات المسجلة</h1>
+  <ul id="pharmacy-list">
+    <li>جاري التحميل...</li>
+  </ul>
 
-<h1>قائمة الصيدليات المسجلة</h1>
-<table>
-    <thead>
-        <tr>
-            <th>الاسم</th>
-            <th>رقم الواتس</th>
-            <th>تفاصيل الموقع</th>
-            <th>chatId</th>
-        </tr>
-    </thead>
-    <tbody id="pharmaciesTable">
-    </tbody>
-</table>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-<script>
-// إعداد Firebase
-const firebaseConfig = {
-  apiKey: "API_KEY_HERE",
-  authDomain: "PROJECT_ID.firebaseapp.com",
-  projectId: "PROJECT_ID",
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+    // إعدادات Firebase الحقيقية
+    const firebaseConfig = {
+      apiKey: "AIzaSyDlEBzVFhJzFkDI4mWnTSEQbUGOYBoVvbI",
+      authDomain: "group-2f790.firebaseapp.com",
+      projectId: "group-2f790",
+      storageBucket: "group-2f790.appspot.com",
+      messagingSenderId: "532610990999",
+      appId: "1:532610990999:web:1ad2bf5149c68774e57ad2"
+    };
 
-const tableBody = document.getElementById("pharmaciesTable");
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-db.collection("pharmacies").get().then(snapshot => {
-    snapshot.forEach(doc => {
+    async function loadPharmacies() {
+      const pharmaciesCol = collection(db, 'pharmacies');
+      const snapshot = await getDocs(pharmaciesCol);
+      const list = document.getElementById('pharmacy-list');
+      list.innerHTML = ''; // تفريغ القائمة قبل العرض
+      snapshot.forEach(doc => {
         const data = doc.data();
-        const row = document.createElement("tr");
-        row.innerHTML = `
-            <td>${data.name || ""}</td>
-            <td>${data.whatsapp || ""}</td>
-            <td>${data.address || ""}</td>
-            <td>${data.chatId}</td>
-        `;
-        tableBody.appendChild(row);
-    });
-});
-</script>
+        const li = document.createElement('li');
+        li.textContent = `${data.name} - واتس: ${data.whatsapp} - تفاصيل: ${data.details}`;
+        list.appendChild(li);
+      });
+    }
+
+    window.onload = loadPharmacies;
+  </script>
 </body>
 </html>
