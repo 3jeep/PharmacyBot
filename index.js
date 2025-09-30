@@ -1,6 +1,5 @@
 // ====== استدعاء المكتبات ======
 const admin = require('firebase-admin');
-const { Client, LocalAuth } = require('whatsapp-web.js'); // لو عندك واتساب بوت
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config(); // مهم جداً
@@ -40,23 +39,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// صفحة index.html
 app.get('/', (req, res) => {
   res.sendFile('index.html', { root: 'public' });
 });
 
-// ====== حفظ بيانات الصيدليات ======
+// حفظ بيانات الصيدليات
 app.post('/save-pharmacy', async (req, res) => {
   try {
     const { name, whatsapp, location, chatId } = req.body;
 
-    // لوج للبيانات القادمة
     console.log("بيانات الصيدلي القادمة:", { name, whatsapp, location, chatId });
 
     if (!chatId || !name || !whatsapp || !location) {
       return res.status(400).json({ success: false, message: "البيانات ناقصة!" });
     }
 
-    // حفظ في Firebase
     const docRef = db.collection('pharmacies').doc(chatId.toString());
     await docRef.set({
       name,
@@ -72,6 +70,18 @@ app.post('/save-pharmacy', async (req, res) => {
   } catch (error) {
     console.error("❌ خطأ أثناء حفظ البيانات:", error.message);
     res.status(500).json({ success: false, message: "حدث خطأ أثناء حفظ البيانات" });
+  }
+});
+
+// استرجاع بيانات الصيدليات للعرض
+app.get('/pharmacies', async (req, res) => {
+  try {
+    const snapshot = await db.collection('pharmacies').orderBy('timestamp', 'desc').get();
+    const pharmacies = snapshot.docs.map(doc => doc.data());
+    res.json(pharmacies);
+  } catch (error) {
+    console.error("❌ خطأ أثناء جلب البيانات:", error.message);
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب البيانات" });
   }
 });
 
