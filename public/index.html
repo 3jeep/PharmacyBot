@@ -1,38 +1,60 @@
-const admin = require('firebase-admin');
-const TelegramBot = require('node-telegram-bot-api');
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>قائمة الصيدليات</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; }
+h1 { color: #4f46e5; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+th { background-color: #f0f0f0; }
+</style>
+</head>
+<body>
 
+<h1>قائمة الصيدليات المسجلة</h1>
+<table>
+    <thead>
+        <tr>
+            <th>الاسم</th>
+            <th>رقم الواتس</th>
+            <th>تفاصيل الموقع</th>
+            <th>chatId</th>
+        </tr>
+    </thead>
+    <tbody id="pharmaciesTable">
+    </tbody>
+</table>
+
+<script>
 // إعداد Firebase
-const serviceAccount = require('./serviceAccountKey.json'); // ملف مفتاحك الخاص
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+const firebaseConfig = {
+  apiKey: "API_KEY_HERE",
+  authDomain: "PROJECT_ID.firebaseapp.com",
+  projectId: "PROJECT_ID",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const tableBody = document.getElementById("pharmaciesTable");
+
+db.collection("pharmacies").get().then(snapshot => {
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${data.name || ""}</td>
+            <td>${data.whatsapp || ""}</td>
+            <td>${data.address || ""}</td>
+            <td>${data.chatId}</td>
+        `;
+        tableBody.appendChild(row);
+    });
 });
-const db = admin.firestore();
-
-// إعداد البوت
-const token = "8296205913:AAHmtYsc3ViT_OrofOZMzYG6UTcepXdpD5c"; // ضع توكن البوت هنا
-const bot = new TelegramBot(token, { polling: true });
-
-// استقبال رسالة /start
-bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    const firstName = msg.chat.first_name || '';
-    const username = msg.chat.username || '';
-    
-    // مثال: بيانات الصيدلية يمكن إرسالها يدوياً بالبوت أو في رسالة أخرى
-    const pharmacyData = {
-        chatId: chatId,
-        name: firstName,
-        username: username,
-        whatsapp: "أرسل رقمك هنا",       // يمكن تحديثه لاحقاً
-        address: "تفاصيل الموقع هنا",   // يمكن تحديثها لاحقاً
-        timestamp: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    try {
-        await db.collection('pharmacies').doc(String(chatId)).set(pharmacyData);
-        bot.sendMessage(chatId, "✅ تم تسجيل بياناتك في قاعدة الصيدليات بنجاح!");
-    } catch (e) {
-        bot.sendMessage(chatId, "❌ حدث خطأ أثناء التسجيل.");
-        console.error(e);
-    }
-});
+</script>
+</body>
+</html>
