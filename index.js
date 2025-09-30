@@ -46,12 +46,19 @@ const bot = new TelegramBot(token);
 
 // إعداد Webhook لاستقبال الرسائل من تلغرام
 app.post(`/bot${token}`, (req, res) => {
-    // هذا هو السطر الذي أضفناه للاختبار!
+    // هذا السطر للتأكد من استقبال الطلب
     console.log("استلمت طلباً جديداً من تلغرام!"); 
 
     bot.processUpdate(req.body);
     res.sendStatus(200);
 });
+
+// ====== إضافة وظيفة الرد على أمر /start (للتأكد من عمل البوت) ======
+bot.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, "مرحباً! هذا هو نظام بوت الصيدليات. يرجى إرسال /test للتأكد من عمل البوت.");
+});
+
 
 // ====== 5. وظيفة البحث في الصيدليات وإرسال الرسائل ======
 app.post('/search-medicine', async (req, res) => {
@@ -76,7 +83,7 @@ app.post('/search-medicine', async (req, res) => {
 
     const message = `طلب دواء جديد:\n\n*اسم الدواء:* ${medicineName}\n*المنطقة:* ${area}\n\nهل الدواء متوفر لديكم؟`;
     
-    // **التصحيح هنا:** تم تغيير (p tharmacy) إلى (pharmacy)
+    // التصحيح تم هنا
     for (const pharmacy of pharmacies) {
         bot.sendMessage(pharmacy.chatId, message);
     }
@@ -87,9 +94,20 @@ app.post('/search-medicine', async (req, res) => {
 
 // ====== 6. الاستماع لردود الصيدليات وتحديث Firebase ======
 bot.on('message', async (msg) => {
-    // هذا الجزء سيعمل فقط إذا نجح السطر "استلمت طلباً جديداً من تلغرام!"
+    // نتأكد من تجاهل أمر /start لتجنب التكرار
+    if (msg.text && msg.text.startsWith('/start')) return; 
+    
+    // إضافة أمر اختبار للرد الفوري
+    if (msg.text && msg.text.toLowerCase() === '/test') {
+        const chatId = msg.chat.id;
+        return bot.sendMessage(chatId, 'نعم! البوت يعمل ويرد الآن بشكل مباشر.');
+    }
+
     const chatId = msg.chat.id;
     const text = msg.text;
+
+    // لتسجيل أي رسالة يتم استلامها 
+    console.log(`تم استلام رسالة: ${text} من ${chatId}`);
 
     if (text.toLowerCase().includes('متوفر')) {
         
@@ -107,6 +125,10 @@ bot.on('message', async (msg) => {
         bot.sendMessage(chatId, 'شكراً لك على تأكيد توفر الدواء!');
 
     } else {
-        console.log(`تم استلام رد سلبي من الصيدلية: ${chatId}`);
+        // رسالة افتراضية للرد على أي رسالة أخرى
+        // سيتم تغيير هذا لاحقاً للتعامل مع طلبات الأدوية من المستخدمين العاديين
+        const chatId = msg.chat.id;
+        bot.sendMessage(chatId, 'عفواً، لم أفهم طلبك. أنا مبرمج للرد على أمر /start أو كلمة "متوفر".');
+        console.log(`تم استلام رسالة لا تحمل كلمة متوفر: ${chatId}`);
     }
 });
