@@ -1,111 +1,126 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>خدمة البحث عن الأدوية - الصيدليات</title><!-- تحميل Tailwind CSS للتصميم --><script src="https://cdn.tailwindcss.com"></script><style>body {font-family: 'Inter', sans-serif, system-ui;}/* كلاس للتحميل (Loader) /.loader {border: 4px solid #f3f3f3; / رمادي فاتح /border-top: 4px solid #4f46e5; / نيلي */border-radius: 50%;width: 18px;height: 18px;animation: spin 1s linear infinite;}@keyframes spin {0% { transform: rotate(0deg); }100% { transform: rotate(360deg); }}</style></head><body class="bg-gray-50 min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl space-y-6">
-    <h1 class="text-3xl font-extrabold text-indigo-700 text-center border-b pb-4 mb-6">
-        البحث عن دواء في الصيدليات
-    </h1>
+// ====== 1. استدعاء المكتبات المطلوبة ======const admin = require('firebase-admin');const express = require('express');const TelegramBot = require('node-telegram-bot-api');const cors = require('cors');// ====== 2. إعداد Firebase (يتم تهيئتها داخل دالة async) ======const serviceAccount = {type: "service_account",project_id: process.env.FIREBASE_PROJECT_ID,private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\n/g, '\n') : undefined,client_email: process.env.FIREBASE_CLIENT_EMAIL,client_id: process.env.FIREBASE_CLIENT_ID,auth_uri: "https://accounts.google.com/o/oauth2/auth",token_uri: "https://oauth2.googleapis.com/token",auth_provider_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,universe_domain: "googleapis.com"};let db;// دالة رئيسية async للبدء والتشغيل (تحل مشكلة 'await is only valid...')async function initializeAndStartServer() {try {// تهيئة Firebaseadmin.initializeApp({credential: admin.credential.cert(serviceAccount)});console.log("Firebase connected ✅");db = admin.firestore();} catch (error) {
+    console.error("FIREBASE ERROR: Failed to initialize Firebase:", error.message);
+    process.exit(1);
+}
+
+// ====== 3. إعداد Express و تشغيل الخادم ======
+const app = express();
+const PORT = process.env.PORT || 10000;
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const webhookUrl = `https://pharmacybotservice.onrender.com/webhook`; 
+
+// الحل لمشكلة CORS
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public')); 
+
+app.get('/', (req, res) => {
+    res.sendFile('index.html', { root: 'public' });
+});
+
+
+// ====== 4. إعداد Telegram Bot و Webhook ======
+const bot = new TelegramBot(token, { polling: false });
+
+if (!token) {
+    console.error("TELEGRAM_BOT_TOKEN is missing. Cannot start bot.");
+    process.exit(1);
+} else {
+    console.log("Telegram Token found.");
+}
+
+// إعداد Webhook
+bot.setWebHook(webhookUrl).then(() => {
+    console.log(`Webhook set to ${webhookUrl}`);
+}).catch(e => {
+    console.error("Error setting webhook:", e.message);
+});
+
+app.post(`/webhook`, (req, res) => {
+    console.log("استلمت طلباً جديداً من تلغرام على المسار /webhook!");
+    bot.processUpdate(req.body);
+    res.sendStatus(200); 
+});
+
+
+// ====== 5. وظيفة البحث في الصيدليات وإرسال الرسائل (Async Function) ======
+app.post('/search-medicine', async (req, res) => {
+    const { medicineName, area } = req.body;
     
-    <!-- نموذج البحث -->
-    <form id="searchForm" class="space-y-4">
-        <div>
-            <label for="medicineName" class="block text-sm font-medium text-gray-700">اسم الدواء:</label>
-            <input type="text" id="medicineName" name="medicineName" required 
-                   class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-                   placeholder="مثال: باراسيتامول">
-        </div>
-        
-        <div>
-            <label for="area" class="block text-sm font-medium text-gray-700">المنطقة (المحافظة):</label>
-            <input type="text" id="area" name="area" required 
-                   class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
-                   placeholder="مثال: الخرطوم، بحري، أم درمان">
-        </div>
-        
-        <button type="submit" id="submitButton" 
-                class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200 ease-in-out disabled:bg-indigo-400 disabled:cursor-not-allowed">
-            إرسال طلب البحث
-        </button>
-    </form>
+    const searchRef = db.collection('searches').doc();
+    const searchId = searchRef.id;
 
-    <!-- منطقة رسالة الحالة -->
-    <div id="statusMessage" class="text-center p-3 rounded-lg font-medium hidden"></div>
-
-</div>
-
-<script>
-    // رابط الخادم الخاص بك على Render.com
-    const RENDER_API_URL = 'https://pharmacybotservice.onrender.com/search-medicine';
-    
-    const form = document.getElementById('searchForm');
-    const statusMessage = document.getElementById('statusMessage');
-    const submitButton = document.getElementById('submitButton');
-
-    // دالة لعرض رسالة الحالة
-    const displayStatus = (message, type = 'info') => {
-        statusMessage.innerHTML = message;
-        statusMessage.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800', 'bg-blue-100', 'text-blue-800');
-        
-        if (type === 'success') {
-            statusMessage.classList.add('bg-green-100', 'text-green-800');
-        } else if (type === 'error') {
-            statusMessage.classList.add('bg-red-100', 'text-red-800');
-        } else {
-            statusMessage.classList.add('bg-blue-100', 'text-blue-800');
-        }
-    };
-
-    // معالج إرسال النموذج
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        submitButton.disabled = true;
-        submitButton.innerHTML = '<div class="loader"></div> <span class="mr-2">جاري الإرسال...</span>';
-        
-        const medicineName = document.getElementById('medicineName').value.trim();
-        const area = document.getElementById('area').value.trim();
-        
-        // إضافة مهلة لضمان استيقاظ خادم Render (40 ثانية)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 ثانية
-
-        try {
-            displayStatus('جارٍ إرسال طلبك إلى الخادم (قد يستغرق 30 ثانية إذا كان الخادم نائماً)...', 'info');
-            
-            const response = await fetch(RENDER_API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ medicineName, area }),
-                signal: controller.signal // ربط إشارة الإلغاء بالطلب
-            });
-            
-            clearTimeout(timeoutId); // إلغاء التايمر
-
-            const result = await response.json();
-
-            if (response.ok) {
-                displayStatus('✅ تم إرسال طلب البحث بنجاح. سيصل التنبيه للصيدليات.', 'success');
-                // مسح الحقول بعد النجاح
-                document.getElementById('medicineName').value = '';
-                document.getElementById('area').value = '';
-
-            } else {
-                // إذا كان هناك خطأ من الخادم نفسه (مثل 500)
-                displayStatus(`❌ فشل في الخادم. رمز الخطأ: ${response.status}. رسالة: ${result.message || 'خطأ غير معروف.'}`, 'error');
-            }
-
-        } catch (error) {
-            clearTimeout(timeoutId); // إلغاء التايمر
-
-            if (error.name === 'AbortError') {
-                // خطأ المهلة
-                 displayStatus('⚠️ فشل في الاتصال بالشبكة: انتهت مهلة الاتصال بالخادم. يرجى المحاولة مرة أخرى.', 'error');
-            } else {
-                // خطأ في الشبكة أو CORS
-                console.error('Network or CORS Error:', error);
-                displayStatus('❌ خطأ في الاتصال بالشبكة أو إعدادات الأمان (CORS). يرجى التأكد من أن الخادم يعمل.', 'error');
-            }
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'إرسال طلب البحث';
-        }
+    await searchRef.set({
+        medicineName,
+        area,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        status: 'pending'
     });
-</script>
-</body></html>
+
+    const pharmacies = [
+        { name: "صيدلية التوفيق", chatId: "YOUR_PHARMACY_CHAT_ID_1" },
+        { name: "صيدلية النور", chatId: "YOUR_PHARMACY_CHAT_ID_2" }
+    ];
+
+    const message = `طلب دواء جديد:\n\n*اسم الدواء:* ${medicineName}\n*المنطقة:* ${area}\n\nيرجى الرد بـ "متوفر ${searchId}" إذا كان الدواء متوفراً لديكم.`;
+    
+    for (const pharmacy of pharmacies) {
+        try {
+            await bot.sendMessage(pharmacy.chatId, message, { parse_mode: 'Markdown' });
+            console.log(`Sent request to ${pharmacy.name}`);
+        } catch (error) {
+            console.error(`Failed to send message to ${pharmacy.name}: ${error.message}`);
+        }
+    }
+    
+    res.json({ 
+        success: true, 
+        message: 'تم إرسال طلب البحث إلى الصيدليات بنجاح.', 
+        searchId: searchId 
+    });
+});
+
+
+// ====== 6. الاستماع لردود الصيدليات وتحديث Firebase (Async Function) ======
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
+
+    if (text === '/test' || text === '/start') {
+        bot.sendMessage(chatId, 'نعم! البوت يعمل ويرد الآن بشكل مباشر.');
+        return;
+    }
+
+    const match = text.match(/متوفر\s+([a-zA-Z0-9]+)/i);
+
+    if (match) {
+        const searchId = match[1]; 
+        const pharmacyId = chatId;
+
+        console.log(`Received AVAILABILITY confirmation for Search ID: ${searchId} from Chat ID: ${pharmacyId}`);
+
+        const responseRef = db.doc(`searches/${searchId}`);
+        await responseRef.update({
+            status: 'available',
+            availableBy: {
+                chatId: pharmacyId,
+                timestamp: admin.firestore.FieldValue.serverTimestamp()
+            }
+        }).then(() => {
+            bot.sendMessage(chatId, 'شكراً لك على تأكيد توفر الدواء!');
+        }).catch(e => {
+            bot.sendMessage(chatId, 'عفواً، فشل تحديث حالة الطلب. قد يكون معرف الطلب غير صحيح.');
+            console.error('Firebase update failed:', e.message);
+        });
+
+    } else {
+        console.log(`تم استلام رسالة عادية من: ${chatId}. النص: ${text}`);
+    }
+});
+
+
+// ====== 7. بدء تشغيل الخادم ======
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`); 
+});
+}// تشغيل وظيفة الإعداد والبدءinitializeAndStartServer();
